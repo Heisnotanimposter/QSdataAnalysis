@@ -11,40 +11,61 @@ CORS(app)
 def get_rankings():
     try:
         # Load CSV data
-        csv_path = os.path.join(os.path.dirname(__file__), '..', 'world_university_rankings_2026.csv')
+        csv_path = os.path.join(os.path.dirname(__file__), '..', '..', 'world_university_rankings_2026.csv')
         df = pd.read_csv(csv_path)
         
         # Convert to the format expected by the frontend
         rankings = []
         for _, row in df.iterrows():
+            def to_int(val):
+                try:
+                    return int(float(val)) if pd.notna(val) else None
+                except:
+                    return None
+                
+            def to_float(val):
+                try:
+                    return float(val) if pd.notna(val) else 0.0
+                except:
+                    return 0.0
+
+            def to_float_or_none(val):
+                try:
+                    return float(val) if pd.notna(val) else None
+                except:
+                    return None
+            
+            # Determine tuition fee range
+            tuition = "40,000 - 60,000 USD" if row.get('university_type') == 'Private' else "5,000 - 15,000 USD"
+            
             university = {
                 "university_id": f"U{row.name + 1:03d}",
                 "university_name": row['university'],
                 "country": row['country'],
                 "region": row['region'],
-                "university_type": row['university_type'],
+                "university_type": row['university_type'] if pd.notna(row['university_type']) else 'Public',
                 "subject_area": ["General"],
-                "qs_rank": int(row['qs_rank_2026']) if pd.notna(row['qs_rank_2026']) else None,
-                "the_rank": int(row['the_rank_2026']) if pd.notna(row['the_rank_2026']) else None,
-                "arwu_rank": int(row['arwu_rank_2025']) if pd.notna(row['arwu_rank_2025']) else None,
+                "qs_rank": to_int(row.get('qs_rank_2026')),
+                "the_rank": to_int(row.get('the_rank_2026')),
+                "arwu_rank": to_int(row.get('arwu_rank_2025')),
                 "scimago_rank": None,
                 "webometrics_rank": None,
                 "studyportals_rank": None,
                 "uniranks_rank": None,
-                "qs_stars": "5 Stars",
-                "sustainability_score": float(row['qs_intl_students']) if pd.notna(row['qs_intl_students']) else 0.0,
-                "research_impact_score": float(row['qs_citations']) if pd.notna(row['qs_citations']) else 0.0,
-                "employer_reputation_score": float(row['qs_employer_rep']) if pd.notna(row['qs_employer_rep']) else 0.0,
-                "faculty_student_ratio": float(row['qs_faculty_student']) if pd.notna(row['qs_faculty_student']) else 0.0,
-                "international_outlook_score": float(row['qs_intl_faculty']) if pd.notna(row['qs_intl_faculty']) else 0.0,
-                "teaching_quality_score": float(row['the_teaching']) if pd.notna(row['the_teaching']) else 0.0,
-                "founding_year": int(row['founded']) if pd.notna(row['founded']) else 1800,
-                "student_population": int(row['total_students']) if pd.notna(row['total_students']) else 0,
-                "international_student_percentage": float(row['intl_students_pct']) if pd.notna(row['intl_students_pct']) else 0.0,
-                "nobel_laureates": int(row['nobel_laureates']) if pd.notna(row['nobel_laureates']) else 0,
-                "tuition_fee_range": "Varies by institution",
-                "programs_offered": ["Various"],
-                "website_url": f"https://www.{row['university'].lower().replace(' ', '').replace(',', '').replace('.', '')}.edu",
+                "qs_stars": "5 Stars" if to_int(row.get('qs_rank_2026')) and to_int(row.get('qs_rank_2026')) <= 50 else "4 Stars",
+                "sustainability_score": to_float(row.get('qs_score')),
+                "research_impact_score": to_float(row.get('qs_citations')),
+                "employer_reputation_score": to_float(row.get('qs_employer_rep')),
+                "faculty_student_ratio": to_float(row.get('qs_faculty_student')),
+                "international_outlook_score": to_float(row.get('the_intl_outlook')),
+                "teaching_quality_score": to_float(row.get('the_teaching')),
+                "founding_year": to_int(row.get('founded')),
+                "student_population": to_int(row.get('total_students')),
+                "international_student_percentage": to_float_or_none(row.get('intl_students_pct')),
+                "nobel_laureates": to_int(row.get('nobel_laureates')),
+                "tuition_fee_range": tuition,
+                "programs_offered": ["BSc", "MSc", "PhD"],
+                "website_url": f"https://www.{str(row['university']).lower().replace(' ', '').replace(',', '').replace('.', '')}.edu",
                 "univrank": 0  # Will be calculated by frontend
             }
             rankings.append(university)
