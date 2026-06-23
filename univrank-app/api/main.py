@@ -24,15 +24,30 @@ class University(BaseModel):
     university_name: str
     country: str
     region: str
-    univrank: int
+    university_type: str
+    subject_area: List[str]
     qs_rank: Optional[int]
     the_rank: Optional[int]
     arwu_rank: Optional[int]
-    sustainability_score: float
-    research_impact_score: float
+    scimago_rank: Optional[int] = None
+    webometrics_rank: Optional[int] = None
+    studyportals_rank: Optional[int] = None
+    uniranks_rank: Optional[int] = None
+    qs_stars: str
+    sustainability_score: Optional[float]
+    research_impact_score: Optional[float]
+    employer_reputation_score: Optional[float]
+    faculty_student_ratio: Optional[float]
+    international_outlook_score: Optional[float]
+    teaching_quality_score: Optional[float]
+    founding_year: Optional[int]
     student_population: Optional[int]
+    international_student_percentage: Optional[float]
+    nobel_laureates: Optional[int]
     tuition_fee_range: str
+    programs_offered: List[str]
     website_url: str
+    univrank: int
 
 def load_data():
     # Try to load CSV data first
@@ -41,20 +56,56 @@ def load_data():
             df = pd.read_csv(CSV_PATH)
             rankings = []
             for _, row in df.iterrows():
+                # Safe float/int conversions
+                def to_int(val):
+                    try:
+                        return int(float(val)) if pd.notna(val) else None
+                    except:
+                        return None
+                    
+                def to_float(val):
+                    try:
+                        return float(val) if pd.notna(val) else 0.0
+                    except:
+                        return 0.0
+
+                def to_float_or_none(val):
+                    try:
+                        return float(val) if pd.notna(val) else None
+                    except:
+                        return None
+                
+                # Determine tuition fee range
+                tuition = "40,000 - 60,000 USD" if row.get('university_type') == 'Private' else "5,000 - 15,000 USD"
+                
                 university = {
                     "university_id": f"U{row.name + 1:03d}",
                     "university_name": row['university'],
                     "country": row['country'],
                     "region": row['region'],
-                    "university_type": row['university_type'],
-                    "qs_rank": int(row['qs_rank_2026']) if pd.notna(row['qs_rank_2026']) else None,
-                    "the_rank": int(row['the_rank_2026']) if pd.notna(row['the_rank_2026']) else None,
-                    "arwu_rank": int(row['arwu_rank_2025']) if pd.notna(row['arwu_rank_2025']) else None,
-                    "sustainability_score": float(row['qs_intl_students']) if pd.notna(row['qs_intl_students']) else 0.0,
-                    "research_impact_score": float(row['qs_citations']) if pd.notna(row['qs_citations']) else 0.0,
-                    "student_population": int(row['total_students']) if pd.notna(row['total_students']) else 0,
-                    "tuition_fee_range": "Varies by institution",
-                    "website_url": f"https://www.{row['university'].lower().replace(' ', '').replace(',', '').replace('.', '')}.edu",
+                    "university_type": row['university_type'] if pd.notna(row['university_type']) else 'Public',
+                    "subject_area": ["General"],
+                    "qs_rank": to_int(row.get('qs_rank_2026')),
+                    "the_rank": to_int(row.get('the_rank_2026')),
+                    "arwu_rank": to_int(row.get('arwu_rank_2025')),
+                    "scimago_rank": None,
+                    "webometrics_rank": None,
+                    "studyportals_rank": None,
+                    "uniranks_rank": None,
+                    "qs_stars": "5 Stars" if to_int(row.get('qs_rank_2026')) and to_int(row.get('qs_rank_2026')) <= 50 else "4 Stars",
+                    "sustainability_score": to_float(row.get('qs_score')),
+                    "research_impact_score": to_float(row.get('qs_citations')),
+                    "employer_reputation_score": to_float(row.get('qs_employer_rep')),
+                    "faculty_student_ratio": to_float(row.get('qs_faculty_student')),
+                    "international_outlook_score": to_float(row.get('the_intl_outlook')),
+                    "teaching_quality_score": to_float(row.get('the_teaching')),
+                    "founding_year": to_int(row.get('founded')),
+                    "student_population": to_int(row.get('total_students')),
+                    "international_student_percentage": to_float_or_none(row.get('intl_students_pct')),
+                    "nobel_laureates": to_int(row.get('nobel_laureates')),
+                    "tuition_fee_range": tuition,
+                    "programs_offered": ["BSc", "MSc", "PhD"],
+                    "website_url": f"https://www.{str(row['university']).lower().replace(' ', '').replace(',', '').replace('.', '')}.edu",
                     "univrank": 0  # Will be calculated by frontend
                 }
                 rankings.append(university)
@@ -110,7 +161,9 @@ async def evaluate_applicant(applicant_data: dict):
             raise HTTPException(status_code=404, detail="Target university not found")
         
         # Calculate acceptance probability (simplified algorithm)
-        target_rank = target_data.get("qs_rank", 100)
+        target_rank = target_data.get("qs_rank")
+        if target_rank is None or pd.isna(target_rank):
+            target_rank = 100
         
         # Factors affecting admission
         gpa_score = (applicant_gpa / 4.0) * 30  # 30% weight
